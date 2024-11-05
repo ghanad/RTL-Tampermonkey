@@ -1,4 +1,3 @@
-// content.js
 function loadSettings(callback) {
   chrome.storage.sync.get({
     selectedFont: 'Vazirmatn',
