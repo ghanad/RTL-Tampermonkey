@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek RTL
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Makes Persian text RTL in chat interface and applies Vazir font
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
@@ -10,7 +10,6 @@
 (function() {
     'use strict';
 
-    // اضافه کردن فونت وزیرمتن
     const fontStyle = `
         @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
 
@@ -19,12 +18,10 @@
         }
     `;
 
-    // اضافه کردن استایل به صفحه
     const styleSheet = document.createElement('style');
     styleSheet.textContent = fontStyle;
     document.head.appendChild(styleSheet);
 
-    // تنظیمات قابل تغییر
     const config = {
         checkInterval: 1000,
         maxAttempts: 50
@@ -43,7 +40,7 @@
         if (hasPersianText(element.textContent)) {
             element.style.direction = 'rtl';
             element.style.textAlign = 'right';
-            element.style.unicodeBidi = 'bidi-override';
+            element.style.unicodeBidi = 'plaintext';
             element.classList.add('rtl-persian');
             element.setAttribute('data-rtl-fixed', 'true');
         }
@@ -54,14 +51,11 @@
             return;
         }
 
-        // اعمال فونت به المان ورودی
         element.classList.add('rtl-persian');
 
-        // تنظیم RTL اولیه
         element.style.direction = 'rtl';
         element.style.textAlign = 'right';
 
-        // رویداد input
         element.addEventListener('input', function() {
             if (hasPersianText(this.value)) {
                 this.style.direction = 'rtl';
@@ -70,11 +64,9 @@
             } else {
                 this.style.direction = 'ltr';
                 this.style.textAlign = 'left';
-                // فونت را برای متون غیر فارسی حفظ می‌کنیم
             }
         });
 
-        // رویداد focus
         element.addEventListener('focus', function() {
             if (hasPersianText(this.value)) {
                 this.style.direction = 'rtl';
@@ -86,7 +78,6 @@
     }
 
     function processNewElements() {
-        // پردازش المان‌های متنی معمولی
         const textElements = document.querySelectorAll('p, span, div');
         textElements.forEach(element => {
             if (element.childNodes.length === 1 && element.childNodes[0].nodeType === 3) {
@@ -94,7 +85,6 @@
             }
         });
 
-        // پردازش ورودی‌های متنی
         const inputElements = document.querySelectorAll('input[type="text"], textarea, [contenteditable="true"]');
         inputElements.forEach(handleInput);
     }
@@ -107,7 +97,6 @@
         });
     });
 
-    // شروع مشاهده تغییرات DOM پس از بارگذاری صفحه
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
             observer.observe(document.body, {
