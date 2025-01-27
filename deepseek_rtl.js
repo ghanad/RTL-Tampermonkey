@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         DeepSeek RTL
+// @name         DeepSeek RTL Enhanced
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Makes Persian text RTL in chat interface and applies Vazir font with proper mixed language support
+// @version      1.5
+// @description  Makes Persian text RTL in chat interface with improved heading and nested element support
 // @match        https://chat.deepseek.com/*
 // @grant        GM_addStyle
 // ==/UserScript==
@@ -13,11 +13,51 @@
     const fontStyle = `
         @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
 
+        /* تنظیمات اصلی برای المان‌های فارسی */
         .rtl-persian {
             font-family: Vazirmatn, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+            direction: rtl !important;
+            text-align: right !important;
         }
 
-        /* تنظیم alignment برای متون انگلیسی */
+        /* تنظیمات مخصوص برای هدینگ‌ها با specificity بالاتر */
+        h1.rtl-persian, 
+        h2.rtl-persian, 
+        h3.rtl-persian, 
+        h4.rtl-persian, 
+        h5.rtl-persian, 
+        h6.rtl-persian {
+            direction: rtl !important;
+            text-align: right !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            width: 100% !important;
+        }
+
+        /* تنظیمات برای هدینگ‌های درون کانتینر RTL */
+        .rtl-persian h1, 
+        .rtl-persian h2, 
+        .rtl-persian h3, 
+        .rtl-persian h4, 
+        .rtl-persian h5, 
+        .rtl-persian h6 {
+            direction: rtl !important;
+            text-align: right !important;
+            width: 100% !important;
+        }
+
+        /* تنظیمات برای المان‌های درون هدینگ */
+        h1.rtl-persian *, 
+        h2.rtl-persian *, 
+        h3.rtl-persian *, 
+        h4.rtl-persian *, 
+        h5.rtl-persian *, 
+        h6.rtl-persian * {
+            direction: inherit !important;
+            text-align: inherit !important;
+        }
+
+        /* تنظیمات برای متون انگلیسی */
         .ltr-text {
             direction: ltr !important;
             text-align: left !important;
@@ -25,21 +65,57 @@
 
         /* تنظیمات مخصوص لیست‌ها */
         .rtl-persian ul,
-        .rtl-persian ol {
-            padding-right: 1.5em !important;
-            padding-left: 0 !important;
-            margin-right: 1.5em !important;
+        .rtl-persian ol,
+        ul.rtl-persian,
+        ol.rtl-persian {
+            direction: rtl !important;
+            list-style-position: outside !important;
+            margin: 13.716px 0 !important;
+            padding: 0 27.432px 0 0 !important;
+        }
+
+        /* اعمال direction برای bullet ها */
+        .rtl-persian ul li::marker,
+        .rtl-persian ol li::marker,
+        ul.rtl-persian li::marker,
+        ol.rtl-persian li::marker {
+            direction: rtl !important;
+            unicode-bidi: isolate !important;
             margin-left: 0 !important;
+            margin-right: 27.432px !important;
         }
 
-        .rtl-persian li {
+        .rtl-persian li,
+        li.rtl-persian {
+            direction: rtl !important;
             text-align: right !important;
-            direction: rtl !important;
+            display: list-item !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            padding-left: 0 !important;
         }
 
-        .rtl-persian li::marker {
-            unicode-bidi: isolate;
-            direction: rtl !important;
+        /* تنظیمات برای code درون لیست */
+        .rtl-persian li code,
+        li.rtl-persian code {
+            direction: ltr !important;
+            unicode-bidi: embed !important;
+            display: inline-block !important;
+            font-family: monospace !important;
+        }
+
+        /* تنظیمات برای پاراگراف‌های درون لیست */
+        .rtl-persian li p,
+        li.rtl-persian p {
+            margin: 0 !important;
+            padding: 0 !important;
+            display: inline !important;
+        }
+
+        /* تنظیمات برای المان‌های تو در تو */
+        .rtl-persian * {
+            direction: inherit;
+            text-align: inherit;
         }
     `;
 
@@ -83,24 +159,33 @@
             return false;
         }
 
-        if (element.hasAttribute('data-rtl-fixed')) {
-            return false;
-        }
-
         return true;
     }
 
     function processTextNode(textNode) {
         const text = textNode.textContent;
-        if (!text.trim()) return; // نادیده گرفتن متن‌های خالی
+        if (!text.trim()) return;
 
         const parentElement = textNode.parentElement;
         if (!parentElement || !shouldProcessElement(parentElement)) return;
 
+        // اگر المان والد قبلاً پردازش شده، فقط کلاس را اضافه می‌کنیم
+        if (parentElement.hasAttribute('data-rtl-fixed')) {
+            if (hasPersianText(text)) {
+                parentElement.classList.add('rtl-persian');
+            }
+            return;
+        }
+
         if (hasPersianText(text)) {
-            parentElement.style.direction = 'rtl';
-            parentElement.style.textAlign = 'right';
             parentElement.classList.add('rtl-persian');
+
+            // اعمال RTL به همه المان‌های فرزند
+            parentElement.querySelectorAll('*').forEach(child => {
+                if (shouldProcessElement(child)) {
+                    child.classList.add('rtl-persian');
+                }
+            });
         } else {
             parentElement.classList.add('ltr-text');
         }
@@ -108,22 +193,62 @@
         parentElement.setAttribute('data-rtl-fixed', 'true');
     }
 
-    function makeRTL(element) {
-        if (!shouldProcessElement(element)) {
-            return;
+    function processHeading(heading) {
+        if (heading.hasAttribute('data-rtl-fixed')) return;
+
+        // بررسی مستقیم محتوای متنی هدینگ
+        let hasDirectPersianText = false;
+        heading.childNodes.forEach(node => {
+            if (node.nodeType === 3 && hasPersianText(node.textContent.trim())) {
+                hasDirectPersianText = true;
+            }
+        });
+
+        // بررسی محتوای المان‌های فرزند
+        const hasNestedPersianText = Array.from(heading.querySelectorAll('*')).some(
+            child => shouldProcessElement(child) && hasPersianText(child.textContent.trim())
+        );
+
+        if (hasDirectPersianText || hasNestedPersianText) {
+            heading.classList.add('rtl-persian');
+            
+            // پردازش المان‌های درون هدینگ
+            heading.querySelectorAll('*').forEach(child => {
+                if (shouldProcessElement(child)) {
+                    if (hasPersianText(child.textContent.trim())) {
+                        child.classList.add('rtl-persian');
+                    }
+                }
+            });
         }
 
+        heading.setAttribute('data-rtl-fixed', 'true');
+    }
+
+    function makeRTL(element) {
+        if (!shouldProcessElement(element)) return;
+
+        // پردازش هدینگ‌ها
+        if (/^H[1-6]$/.test(element.tagName)) {
+            processHeading(element);
+        }
+
+        // پردازش نودهای متنی
         element.childNodes.forEach(node => {
             if (node.nodeType === 3) { // Text node
                 processTextNode(node);
             }
         });
 
+        // پردازش المان‌های فرزند
         const childElements = element.querySelectorAll('*');
         childElements.forEach(child => {
             if (shouldProcessElement(child)) {
+                if (/^H[1-6]$/.test(child.tagName)) {
+                    processHeading(child);
+                }
                 child.childNodes.forEach(node => {
-                    if (node.nodeType === 3) { // Text node
+                    if (node.nodeType === 3) {
                         processTextNode(node);
                     }
                 });
@@ -132,9 +257,7 @@
     }
 
     function handleInput(element) {
-        if (element.hasAttribute('data-rtl-input-fixed')) {
-            return;
-        }
+        if (element.hasAttribute('data-rtl-input-fixed')) return;
 
         element.classList.add('rtl-persian');
 
@@ -171,7 +294,7 @@
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.addedNodes.forEach(node => {
-                if (node.nodeType === 1) { // Element node
+                if (node.nodeType === 1) {
                     makeRTL(node);
                     node.querySelectorAll('input[type="text"], textarea, [contenteditable="true"]')
                         .forEach(handleInput);
